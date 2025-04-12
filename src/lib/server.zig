@@ -43,6 +43,13 @@ pub const Server = struct {
         self.server_sock = try server_addr.listen(.{ .reuse_address = true, .force_nonblocking = true });
         defer self.server_sock.deinit();
 
+        const linger_opts: struct { l_onoff: c_int, l_linger: c_int } = .{
+            .l_onoff = @as(c_int, 1),
+            .l_linger = @as(c_int, 20),
+        };
+
+        try posix.setsockopt(self.server_sock.stream.handle, posix.SOL.SOCKET, posix.SO.LINGER, &std.mem.toBytes(linger_opts));
+
         self.polls[0] = .{
             .events = posix.POLL.IN,
             .fd = self.server_sock.stream.handle,

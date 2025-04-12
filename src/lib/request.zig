@@ -42,40 +42,16 @@ fn parseHeaders(iterator: *std.mem.SplitIterator(u8, .sequence), allocator: std.
 fn parseUrl(raw_url: []const u8, host: ?[]const u8, allocator: *const mem.Allocator) !Url {
     var url = raw_url[0..];
 
-    if (mem.startsWith(u8, url, "http")) {
-        if (url[4] == 's') {
-            url = url[8..];
-        } else if (url[4] == ':') {
-            url = url[7..];
-        } else {
-            return HttpError.ParsingError;
-        }
-        const checked_host = host orelse return HttpError.ParsingError;
+    const startIdx = try trimUnnecessaryUrlInfo(url, host);
+    url = url[startIdx..];
 
-        if (!mem.startsWith(u8, url, checked_host)) {
-            return HttpError.ParsingError;
-        }
+    const query_start_idx = mem.indexOf(u8, url, "?") orelse url.len;
 
-        url = url[checked_host.len + 1 ..];
-    }
-
-    const query_start_idx = mem.indexOf(u8, url, "?");
-
-    var path_str = url;
+    var path_str = url[0..query_start_idx];
 
     var query_params: std.StringHashMap([]const u8) = .init(allocator.*);
-    if (query_start_idx) |idx| {
-        path_str = url[0..idx];
-
-        var query_it = mem.splitSequence(u8, url[idx + 1 ..], "&");
-        while (query_it.next()) |query_raw| {
-            var query_split = mem.splitSequence(u8, query_raw, "=");
-
-            const key = query_split.next() orelse break;
-            const value = query_split.next() orelse break;
-
-            try query_params.put(key, value);
-        }
+    if (query_start_idx < url.len) {
+        try parseQueryParams(url[query_start_idx..], &query_params);
     }
 
     var path_arr: std.ArrayList([]const u8) = .init(allocator.*);
@@ -92,6 +68,38 @@ fn parseUrl(raw_url: []const u8, host: ?[]const u8, allocator: *const mem.Alloca
         .query = query_params,
         .params = null,
     };
+}
+
+fn trimUnnecessaryUrlInfo(url: []const u8, host: ?[]const u8) !usize {
+    var new_start_idx: usize = 0;
+    if (mem.startsWith(u8, url, "http")) {
+        if (url[4] == 's') {
+            new_start_idx += 8;
+        } else if (url[4] == ':') {
+            new_start_idx += 7;
+        } else {
+            return HttpError.ParsingError;
+        }
+
+        if (!mem.startsWith(u8, url[new_start_idx..], host.?)) {
+            return HttpError.ParsingError;
+        }
+
+        new_start_idx += host.?.len + 1;
+    }
+    return new_start_idx;
+}
+
+fn parseQueryParams(url: []const u8, query_params: *std.StringHashMap([]const u8)) !void {
+    var query_it = mem.splitSequence(u8, url, "&");
+    while (query_it.next()) |query_raw| {
+        var query_split = mem.splitSequence(u8, query_raw, "=");
+
+        const key = query_split.next() orelse break;
+        const value = query_split.next() orelse break;
+
+        try query_params.put(key, value);
+    }
 }
 
 pub fn setUrlParams(self: *HttpRequest, params: *const std.ArrayList([]const u8)) void {
@@ -215,6 +223,8 @@ test parseHeaders {
 
     try std.testing.expect(headers.count() == 3);
     try std.testing.expect(mem.eql(u8, headers.get("Content-Type").?, "application/x-www-form-urlencoded"));
+    try std.testing.expect(mem.eql(u8, headers.get("Host").?, "example.com"));
+    try std.testing.expect(mem.eql(u8, headers.get("Content-Length").?, "27"));
 
     headers.deinit();
 }

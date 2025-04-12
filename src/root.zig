@@ -3,20 +3,20 @@
 //! start with main.zig instead.
 const std = @import("std");
 
-pub const HttpRequest = @import("request.zig").HttpRequest;
-pub const HttpResponse = @import("response.zig").HttpResponse;
-pub const Router = @import("router.zig").Router;
-pub const HttpMethod = @import("utils.zig").HttpMethod;
-pub const Server = @import("server.zig").Server;
-pub const encoder = @import("encoder.zig");
+pub const HttpRequest = @import("lib/request.zig").HttpRequest;
+pub const HttpResponse = @import("lib/response.zig").HttpResponse;
+pub const Router = @import("lib/router.zig").Router;
+pub const HttpMethod = @import("lib/utils.zig").HttpMethod;
+pub const Server = @import("lib/server.zig").Server;
+pub const encoder = @import("lib/encoder.zig");
 
 const testing = std.testing;
 
 test "basic add functionality" {
-    _ = @import("request.zig");
-    _ = @import("response.zig");
-    _ = @import("router.zig");
-    _ = @import("utils.zig");
-    _ = @import("server.zig");
-    _ = @import("encoder.zig");
+    _ = @import("lib/request.zig");
+    _ = @import("lib/response.zig");
+    _ = @import("lib/router.zig");
+    _ = @import("lib/utils.zig");
+    _ = @import("lib/server.zig");
+    _ = @import("lib/encoder.zig");
 }
