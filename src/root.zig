@@ -7,6 +7,7 @@ pub const HttpRequest = @import("lib/request.zig").HttpRequest;
 pub const HttpResponse = @import("lib/response.zig").HttpResponse;
 pub const Router = @import("lib/router.zig").Router;
 pub const HttpMethod = @import("lib/method.zig").Method;
+pub const HttpStatus = @import("lib/status.zig").Status;
 pub const Server = @import("lib/server.zig").Server;
 pub const encoder = @import("lib/encoder.zig");
 

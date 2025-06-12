@@ -3,28 +3,20 @@ const fmt = std.fmt;
 const mem = std.mem;
 const testing = std.testing;
 
+const Status = @import("status.zig").Status;
 const Encodings = @import("utils.zig").Encodings;
 const encode = @import("encoder.zig").encode;
 
 pub const HttpResponse = @This();
 
-status: u16,
+status: Status,
 headers: std.BufMap,
 body: []u8,
 allocator: mem.Allocator,
 
-pub fn getStatusTxt(status_code: u16) []const u8 {
-    return switch (status_code) {
-        200 => "OK",
-        201 => "Created",
-        500 => "Internal Server Error",
-        else => "Not Found",
-    };
-}
-
 pub fn init(allocator: mem.Allocator) HttpResponse {
     return .{
-        .status = 500,
+        .status = Status.internal_server_error,
         .headers = .init(allocator),
         .body = "",
         .allocator = allocator,
@@ -97,7 +89,7 @@ pub fn serialize(self: *HttpResponse) ![]const u8 {
     const headers_str: []const u8 = try mem.join(self.allocator, "\r\n", list.items);
     defer self.allocator.free(headers_str);
 
-    const serialized_res = try fmt.allocPrint(self.allocator, "HTTP/1.1 {d} {s}\r\n{s}\r\n\r\n{s}", .{ self.status, getStatusTxt(self.status), headers_str, self.body });
+    const serialized_res = try fmt.allocPrint(self.allocator, "HTTP/1.1 {d} {s}\r\n{s}\r\n\r\n{s}", .{ @intFromEnum(self.status), self.status.reasonPhrase(), headers_str, self.body });
 
     return serialized_res[0..];
 }
@@ -123,7 +115,7 @@ test serialize {
     var response1: HttpResponse = .init(testing.allocator);
     defer response1.deinit();
 
-    response1.status = 200;
+    response1.status = Status.ok;
     try response1.headers.put("Content-Type", "text/plain");
 
     const response_ser1 = try response1.serialize();
@@ -134,7 +126,7 @@ test serialize {
     var response2: HttpResponse = .init(testing.allocator);
     defer response2.deinit();
 
-    response2.status = 200;
+    response2.status = Status.ok;
     try response2.headers.put("Content-Type", "text/plain");
 
     try response2.setBody("abc");
