@@ -4,12 +4,12 @@ const testing = std.testing;
 
 const HttpRequest = @import("request.zig");
 const HttpResponse = @import("response.zig");
-const HttpMethod = @import("utils.zig").HttpMethod;
+const Method = @import("method.zig").Method;
 
 pub const Router = @This();
 
 pub const Route = struct {
-    method: HttpMethod,
+    method: Method,
     path: std.ArrayList([]const u8),
     handler: *const fn (req: *const HttpRequest, res: *HttpResponse, allocator: mem.Allocator) anyerror!void,
 
@@ -51,7 +51,7 @@ pub fn deinit(self: *Router) void {
     self.routes.deinit();
 }
 
-pub fn addRoute(self: *Router, method: HttpMethod, path: []const u8, handler: *const fn (req: *const HttpRequest, res: *HttpResponse, allocator: mem.Allocator) anyerror!void) !void {
+pub fn addRoute(self: *Router, method: Method, path: []const u8, handler: *const fn (req: *const HttpRequest, res: *HttpResponse, allocator: mem.Allocator) anyerror!void) !void {
     var path_it = mem.splitSequence(u8, path[1..], "/");
 
     var path_arr: std.ArrayList([]const u8) = .init(self.allocator);
@@ -69,7 +69,7 @@ pub fn addRoute(self: *Router, method: HttpMethod, path: []const u8, handler: *c
     try self.routes.append(route);
 }
 
-pub fn getRoute(self: *Router, method: HttpMethod, path: []const u8) !?*const Route {
+pub fn getRoute(self: *Router, method: Method, path: []const u8) !?*const Route {
     var path_it = mem.splitSequence(u8, path[1..], "/");
 
     const prev_routes: *std.ArrayList(*const Route) = @constCast(&(std.ArrayList(*const Route).init(self.allocator)));

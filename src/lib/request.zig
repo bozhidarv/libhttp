@@ -1,6 +1,5 @@
 const std = @import("std");
-const utils = @import("utils.zig");
-const HttpMethod = utils.HttpMethod;
+const Method = @import("method.zig").Method;
 const mem = std.mem;
 
 pub const HttpError = error{
@@ -10,6 +9,7 @@ pub const HttpError = error{
 pub const HttpRequest = @This();
 
 method: HttpMethod,
+method: Method,
 headers: std.StringHashMap([]const u8),
 url: Url,
 version: []const u8,
@@ -120,7 +120,7 @@ pub fn init(req: []const u8, allocator: mem.Allocator) !HttpRequest {
 
     var req_part = req_it.next() orelse return HttpError.ParsingError;
 
-    const method = std.meta.stringToEnum(HttpMethod, req_part) orelse return HttpError.ParsingError;
+    const method = Method.fromString(req_part, allocator) orelse return HttpError.ParsingError;
 
     req_part = req_it.next() orelse return HttpError.ParsingError;
 
