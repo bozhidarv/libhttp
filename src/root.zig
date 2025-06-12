@@ -9,15 +9,13 @@ pub const Router = @import("lib/router.zig").Router;
 pub const HttpMethod = @import("lib/method.zig").Method;
 pub const HttpStatus = @import("lib/status.zig").Status;
 pub const Server = @import("lib/server.zig").Server;
+pub const Url = @import("utils/url.zig");
 pub const encoder = @import("lib/encoder.zig");
+
+pub const version = "0.0.1";
 
 const testing = std.testing;
 
 test "basic add functionality" {
-    _ = @import("lib/request.zig");
-    _ = @import("lib/response.zig");
-    _ = @import("lib/router.zig");
-    _ = @import("lib/utils.zig");
-    _ = @import("lib/server.zig");
-    _ = @import("lib/encoder.zig");
+    std.testing.refAllDecls(@This());
 }
