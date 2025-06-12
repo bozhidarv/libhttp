@@ -4,6 +4,7 @@ const net = std.net;
 const Router = @import("router.zig");
 const HttpRequest = @import("request.zig");
 const HttpResponse = @import("response.zig");
+const HttpStatus = @import("status.zig").Status;
 
 const MAX_CONNS = 4096;
 
@@ -122,7 +123,7 @@ pub const Server = struct {
                         req.setUrlParams(&url_params);
                         try r.handler(&req, &res, self.allocator);
                     } else {
-                        res.status = 404;
+                        res.status = HttpStatus.no_content;
                     }
 
                     self.conns[i].req = &req;

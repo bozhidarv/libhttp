@@ -8,7 +8,6 @@ pub const HttpError = error{
 
 pub const HttpRequest = @This();
 
-method: HttpMethod,
 method: Method,
 headers: std.StringHashMap([]const u8),
 url: Url,
@@ -120,7 +119,7 @@ pub fn init(req: []const u8, allocator: mem.Allocator) !HttpRequest {
 
     var req_part = req_it.next() orelse return HttpError.ParsingError;
 
-    const method = Method.fromString(req_part, allocator) orelse return HttpError.ParsingError;
+    const method = try Method.fromString(req_part, allocator) orelse return HttpError.ParsingError;
 
     req_part = req_it.next() orelse return HttpError.ParsingError;
 
