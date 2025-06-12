@@ -56,4 +56,35 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_lib_unit_tests.step);
     test_step.dependOn(&run_exe_unit_tests.step);
+
+    const examples = [_]struct { name: []const u8, desc: []const u8 }{
+        .{ .name = "basic", .desc = "Basic HTTP server with file serving" },
+    };
+
+    for (examples) |example| {
+        const example_exe = b.addExecutable(.{
+            .name = b.fmt("httplib_{s}", .{example.name}),
+            .root_source_file = b.path(b.fmt("src/examples/{s}_server.zig", .{example.name})),
+            .target = target,
+            .optimize = optimize,
+        });
+        example_exe.root_module.addImport("libhttp", lib_mod);
+
+        const install_example = b.addInstallArtifact(example_exe, .{});
+        const example_step = b.step(
+            b.fmt("install-{s}", .{example.name}),
+            b.fmt("Install {s}", .{example.desc}),
+        );
+        example_step.dependOn(&install_example.step);
+
+        const run_example = b.addRunArtifact(example_exe);
+        if (b.args) |args| {
+            run_example.addArgs(args);
+        }
+        const run_example_step = b.step(
+            b.fmt("run-{s}", .{example.name}),
+            b.fmt("Run {s}", .{example.desc}),
+        );
+        run_example_step.dependOn(&run_example.step);
+    }
 }
