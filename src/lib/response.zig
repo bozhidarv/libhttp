@@ -5,12 +5,14 @@ const testing = std.testing;
 
 const Status = @import("status.zig").Status;
 const Encodings = @import("utils.zig").Encodings;
+const headers_utils = @import("headers.zig");
+const HeadersMap = headers_utils.ManagedHeadersMap;
 const encode = @import("encoder.zig").encode;
 
 pub const HttpResponse = @This();
 
 status: Status,
-headers: std.BufMap,
+headers: HeadersMap,
 body: []u8,
 allocator: mem.Allocator,
 
@@ -65,13 +67,13 @@ pub fn sendFile(self: *HttpResponse, file_name: []const u8) !void {
     const file_contents = try readEntireFile(file_name, self.allocator);
     defer self.allocator.free(file_contents);
 
-    try self.headers.put("Content-Type", "application/octet-stream");
+    try self.headers.put(headers_utils.HeaderName.CONTENT_TYPE, headers_utils.ContentType.APPLICATION_OCTET_STREAM);
 
     try self.setBody(file_contents);
 }
 
 pub fn serialize(self: *HttpResponse) ![]const u8 {
-    var headers_it = self.headers.iterator();
+    var headers_it = self.headers.raw_headers.iterator();
 
     var list: std.ArrayList([]const u8) = .init(self.allocator);
     defer {

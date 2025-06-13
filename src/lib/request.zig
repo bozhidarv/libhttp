@@ -1,6 +1,7 @@
 const std = @import("std");
 const Url = @import("../utils/url.zig");
 const Method = @import("method.zig").Method;
+const HeadersMap = @import("headers.zig").UnmanagedHeadersMap;
 const mem = std.mem;
 
 pub const HttpError = error{
@@ -10,27 +11,12 @@ pub const HttpError = error{
 pub const HttpRequest = @This();
 
 method: Method,
-headers: std.StringHashMap([]const u8),
+headers: HeadersMap,
 url: Url,
 version: []const u8,
 allocator: mem.Allocator,
 raw_request: []const u8,
 body: ?[]const u8,
-
-fn parseHeaders(iterator: *std.mem.SplitIterator(u8, .sequence), allocator: std.mem.Allocator) !std.StringHashMap([]const u8) {
-    var header_map = std.StringHashMap([]const u8).init(allocator);
-    while (iterator.next()) |header| {
-        if (std.mem.eql(u8, header, "")) {
-            break;
-        }
-        var header_it = mem.splitSequence(u8, header, ": ");
-        const key = header_it.next() orelse break;
-        const value = header_it.next() orelse break;
-        try header_map.put(key, value);
-    }
-
-    return header_map;
-}
 
 pub fn setUrlParams(self: *HttpRequest, params: *const std.ArrayList([]const u8)) void {
     self.url.params = params;
@@ -46,7 +32,7 @@ pub fn init(req: []const u8, allocator: mem.Allocator) !HttpRequest {
 
     var req_it = mem.splitSequence(u8, req_line, " ");
 
-    var headers = try parseHeaders(&it, allocator);
+    var headers = try HeadersMap.parseHeaders(&it, allocator);
 
     var req_part = req_it.next() orelse return HttpError.ParsingError;
 
@@ -90,25 +76,4 @@ pub fn deinit(self: *HttpRequest) void {
     self.url.query.deinit();
     self.allocator.free(self.raw_request);
     self.allocator.free(self.version);
-}
-
-test parseHeaders {
-    var it = mem.splitSequence(u8, "Host: localhost:4221\r\nUser-Agent: curl/7.64.1\r\nAccept: */*\r\n\r\n", "\r\n");
-    var headers = try HttpRequest.parseHeaders(&it, std.testing.allocator);
-
-    try std.testing.expect(headers.count() == 3);
-    try std.testing.expect(mem.eql(u8, headers.get("Host").?, "localhost:4221"));
-
-    headers.deinit();
-
-    it = mem.splitSequence(u8, "Host: example.com\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 27\r\n\r\nfield1=value1&field2=value2", "\r\n");
-
-    headers = try HttpRequest.parseHeaders(&it, std.testing.allocator);
-
-    try std.testing.expect(headers.count() == 3);
-    try std.testing.expect(mem.eql(u8, headers.get("Content-Type").?, "application/x-www-form-urlencoded"));
-    try std.testing.expect(mem.eql(u8, headers.get("Host").?, "example.com"));
-    try std.testing.expect(mem.eql(u8, headers.get("Content-Length").?, "27"));
-
-    headers.deinit();
 }
