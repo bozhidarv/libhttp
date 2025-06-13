@@ -2,9 +2,9 @@ const std = @import("std");
 const posix = std.posix;
 const net = std.net;
 const Router = @import("router.zig");
-const HttpRequest = @import("request.zig");
-const HttpResponse = @import("response.zig");
-const HttpStatus = @import("status.zig").Status;
+const HttpRequest = @import("../http/request.zig");
+const HttpResponse = @import("../http/response.zig");
+const HttpStatus = @import("../http/status.zig").Status;
 
 const MAX_CONNS = 4096;
 

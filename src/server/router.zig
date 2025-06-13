@@ -2,9 +2,9 @@ const std = @import("std");
 const mem = std.mem;
 const testing = std.testing;
 
-const HttpRequest = @import("request.zig");
-const HttpResponse = @import("response.zig");
-const Method = @import("method.zig").Method;
+const HttpRequest = @import("../http/request.zig");
+const HttpResponse = @import("../http/response.zig");
+const Method = @import("../http/method.zig").Method;
 
 pub const Router = @This();
 

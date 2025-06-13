@@ -1,7 +1,7 @@
 const std = @import("std");
 const gzip_compress = std.compress.gzip;
 
-const reader_utils = @import("../utils/inMemmoryReader.zig");
+const reader_utils = @import("../utils/io_utils.zig");
 
 pub fn encode(data: []const u8, allocator: std.mem.Allocator) !std.ArrayList(u8) {
     var ctx = reader_utils.ReaderContext{

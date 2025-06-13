@@ -3,14 +3,14 @@
 //! start with main.zig instead.
 const std = @import("std");
 
-pub const HttpRequest = @import("lib/request.zig").HttpRequest;
-pub const HttpResponse = @import("lib/response.zig").HttpResponse;
-pub const Router = @import("lib/router.zig").Router;
-pub const HttpMethod = @import("lib/method.zig").Method;
-pub const HttpStatus = @import("lib/status.zig").Status;
-pub const headers = @import("lib/headers.zig");
-pub const Server = @import("lib/server.zig").Server;
-pub const Url = @import("utils/url.zig");
+pub const HttpRequest = @import("http/request.zig").HttpRequest;
+pub const HttpResponse = @import("http/response.zig").HttpResponse;
+pub const Router = @import("server/router.zig").Router;
+pub const HttpMethod = @import("http/method.zig").Method;
+pub const HttpStatus = @import("http/status.zig").Status;
+pub const headers = @import("http/headers.zig");
+pub const Server = @import("server/server.zig").Server;
+pub const Url = @import("http/url.zig");
 pub const encoder = @import("encoding/encoder.zig");
 
 pub const version = "0.0.1";

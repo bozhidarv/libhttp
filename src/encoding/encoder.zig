@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const InMemmoryReader = @import("../utils/inMemmoryReader.zig").InMemmoryReader;
+const InMemmoryReader = @import("../utils/io_utils.zig").InMemmoryReader;
 const gzip = @import("gzip.zig");
 
 pub const Encoding = enum {

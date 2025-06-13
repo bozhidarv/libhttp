@@ -1,5 +1,5 @@
 const std = @import("std");
-const Url = @import("../utils/url.zig");
+const Url = @import("url.zig");
 const Method = @import("method.zig").Method;
 const HeadersMap = @import("headers.zig").UnmanagedHeadersMap;
 const mem = std.mem;
