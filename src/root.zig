@@ -11,7 +11,7 @@ pub const HttpStatus = @import("lib/status.zig").Status;
 pub const headers = @import("lib/headers.zig");
 pub const Server = @import("lib/server.zig").Server;
 pub const Url = @import("utils/url.zig");
-pub const encoder = @import("lib/encoder.zig");
+pub const encoder = @import("encoding/encoder.zig");
 
 pub const version = "0.0.1";
 

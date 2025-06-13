@@ -4,10 +4,9 @@ const mem = std.mem;
 const testing = std.testing;
 
 const Status = @import("status.zig").Status;
-const Encodings = @import("utils.zig").Encodings;
 const headers_utils = @import("headers.zig");
 const HeadersMap = headers_utils.ManagedHeadersMap;
-const encode = @import("encoder.zig").encode;
+const encoder = @import("../encoding/encoder.zig");
 
 pub const HttpResponse = @This();
 
@@ -31,8 +30,8 @@ pub fn setBody(self: *HttpResponse, body: []const u8) !void {
     const encoding_str = self.headers.get("Content-Encoding");
 
     if (encoding_str != null) {
-        const encoding = std.meta.stringToEnum(Encodings, encoding_str.?) orelse unreachable;
-        const encoded_body = try encode(body, encoding, self.allocator);
+        const encoding = std.meta.stringToEnum(encoder.Encoding, encoding_str.?) orelse unreachable;
+        const encoded_body = try encoder.encode(body, encoding, self.allocator);
         defer encoded_body.deinit();
 
         self.body = try self.allocator.alloc(u8, encoded_body.items.len);
@@ -100,7 +99,7 @@ pub fn setEncoding(self: *HttpResponse, client_encoding: []const u8) !void {
     var encoding_it = mem.splitSequence(u8, client_encoding, ", ");
 
     while (encoding_it.next()) |encoding| {
-        const parsed_encoding = std.meta.stringToEnum(Encodings, encoding);
+        const parsed_encoding = std.meta.stringToEnum(encoder.Encoding, encoding);
         if (parsed_encoding != null) {
             try self.headers.put("Content-Encoding", encoding);
             break;
