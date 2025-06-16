@@ -106,9 +106,20 @@ pub const Server = struct {
                         }
                     }
 
+                    if (read_data.items.len == 0) {
+                        break :read_blk;
+                    }
+
                     var req: HttpRequest = try .init(read_data.items, self.allocator);
+                    
+                    const conn_header = req.headers.get("Connection");
 
                     var res: HttpResponse = .init(self.allocator);
+
+                    if (conn_header != null and std.mem.eql(u8, conn_header.?, "close")) {
+                        closed = true;
+                        try res.headers.put("Connection", "close");
+                    }
 
                     const encoding = req.headers.get("Accept-Encoding");
                     if (encoding) |e| {
@@ -123,7 +134,7 @@ pub const Server = struct {
                         req.setUrlParams(&url_params);
                         try r.handler(&req, &res, self.allocator);
                     } else {
-                        res.status = HttpStatus.no_content;
+                        res.status = HttpStatus.not_found;
                     }
 
                     self.conns[i].req = &req;
@@ -136,8 +147,6 @@ pub const Server = struct {
 
                     req.deinit();
                     res.deinit();
-
-                    closed = true;
                 }
 
                 if (closed or (self.polls[i].revents & posix.POLL.HUP == posix.POLL.HUP)) {

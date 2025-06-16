@@ -21,7 +21,8 @@ pub const Method = enum {
         for (str, 0..) |ch, i| {
             strUpper[i] = std.ascii.toUpper(ch);
         }
-        return std.meta.stringToEnum(Method, strUpper);
+        const method = std.meta.stringToEnum(Method, strUpper);
+        return method;
     }
 
     /// Convert HTTP method to string

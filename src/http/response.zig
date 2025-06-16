@@ -40,11 +40,6 @@ pub fn setBody(self: *HttpResponse, body: []const u8) !void {
         self.body = try self.allocator.alloc(u8, body.len);
         @memcpy(self.body, body);
     }
-
-    const content_length_str = try fmt.allocPrint(self.allocator, "{}", .{self.body.len});
-    defer self.allocator.free(content_length_str);
-
-    try self.headers.put("Content-Length", content_length_str);
 }
 
 pub fn sendText(self: *HttpResponse, body: []const u8) !void {
@@ -72,6 +67,10 @@ pub fn sendFile(self: *HttpResponse, file_name: []const u8) !void {
 }
 
 pub fn serialize(self: *HttpResponse) ![]const u8 {
+    const content_length_str = try fmt.allocPrint(self.allocator, "{}", .{self.body.len});
+    defer self.allocator.free(content_length_str);
+    try self.headers.put("Content-Length", content_length_str);
+
     var headers_it = self.headers.raw_headers.iterator();
 
     var list: std.ArrayList([]const u8) = .init(self.allocator);
@@ -90,7 +89,11 @@ pub fn serialize(self: *HttpResponse) ![]const u8 {
     const headers_str: []const u8 = try mem.join(self.allocator, "\r\n", list.items);
     defer self.allocator.free(headers_str);
 
-    const serialized_res = try fmt.allocPrint(self.allocator, "HTTP/1.1 {d} {s}\r\n{s}\r\n\r\n{s}", .{ @intFromEnum(self.status), self.status.reasonPhrase(), headers_str, self.body });
+    const additionalRN: []const u8 = if (headers_str.len == 0) "" else "\r\n";
+
+    const serialized_res = try fmt.allocPrint(self.allocator, "HTTP/1.1 {d} {s}\r\n{s}{s}\r\n{s}", .{ @intFromEnum(self.status), self.status.reasonPhrase(), headers_str, additionalRN, self.body });
+
+    std.debug.assert(serialized_res[0] == 'H');
 
     return serialized_res[0..];
 }
