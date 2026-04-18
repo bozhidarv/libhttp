@@ -10,8 +10,8 @@ pub const Router = @This();
 
 pub const Route = struct {
     method: Method,
-    path: std.ArrayList([]const u8),
-    handler: *const fn (req: *const HttpRequest, res: *HttpResponse, allocator: mem.Allocator) anyerror!void,
+    path: std.array_list.AlignedManaged([]const u8, null),
+    handler: *const fn (req: *const HttpRequest, res: *HttpResponse, io: std.Io, allocator: mem.Allocator) anyerror!void,
 
     pub fn deinit(self: *const Route, _: *mem.Allocator) void {
         // for (self.path.items) |path_item| {
@@ -21,8 +21,8 @@ pub const Route = struct {
         self.path.deinit();
     }
 
-    pub fn extractRouteParams(self: *const Route, raw_path: [][]const u8, allocator: mem.Allocator) !std.ArrayList([]const u8) {
-        var url_params: std.ArrayList([]const u8) = .init(allocator);
+    pub fn extractRouteParams(self: *const Route, raw_path: [][]const u8, allocator: mem.Allocator) mem.Allocator.Error!std.array_list.Managed([]const u8) {
+        var url_params: std.array_list.Managed([]const u8) = .init(allocator);
         for (self.path.items, 0..) |path_item, i| {
             if (mem.eql(u8, path_item, "{str}")) {
                 try url_params.append(raw_path[i]);
@@ -32,11 +32,11 @@ pub const Route = struct {
     }
 };
 
-routes: std.ArrayList(Route),
+routes: std.array_list.AlignedManaged(Route, null),
 allocator: mem.Allocator,
 
 pub fn init(allocator: mem.Allocator) Router {
-    const routes: std.ArrayList(Route) = .init(allocator);
+    const routes: std.array_list.AlignedManaged(Route, null) = .init(allocator);
     return .{
         .routes = routes,
         .allocator = allocator,
@@ -51,10 +51,10 @@ pub fn deinit(self: *Router) void {
     self.routes.deinit();
 }
 
-pub fn addRoute(self: *Router, method: Method, path: []const u8, handler: *const fn (req: *const HttpRequest, res: *HttpResponse, allocator: mem.Allocator) anyerror!void) !void {
+pub fn addRoute(self: *Router, method: Method, path: []const u8, handler: *const fn (req: *const HttpRequest, res: *HttpResponse, io: std.Io,  allocator: mem.Allocator) anyerror!void) !void {
     var path_it = mem.splitSequence(u8, path[1..], "/");
 
-    var path_arr: std.ArrayList([]const u8) = .init(self.allocator);
+    var path_arr: std.array_list.AlignedManaged([]const u8, null) = .init(self.allocator);
 
     while (path_it.next()) |path_item| {
         try path_arr.append(path_item);
@@ -72,14 +72,14 @@ pub fn addRoute(self: *Router, method: Method, path: []const u8, handler: *const
 pub fn getRoute(self: *Router, method: Method, path: []const u8) !?*const Route {
     var path_it = mem.splitSequence(u8, path[1..], "/");
 
-    const prev_routes: *std.ArrayList(*const Route) = @constCast(&(std.ArrayList(*const Route).init(self.allocator)));
+    const prev_routes: *std.array_list.Managed(*const Route) = @constCast(&(std.array_list.Managed(*const Route).init(self.allocator)));
     defer prev_routes.*.deinit();
 
     for (0..self.routes.items.len) |i| {
         try prev_routes.*.append(&(self.routes.items[i]));
     }
 
-    var current_routes: *std.ArrayList(*const Route) = @constCast(&(std.ArrayList(*const Route).init(self.allocator)));
+    var current_routes: *std.array_list.Managed(*const Route) = @constCast(&(std.array_list.Managed(*const Route).init(self.allocator)));
     defer current_routes.*.deinit();
 
     var i: u32 = 0;
@@ -96,7 +96,7 @@ pub fn getRoute(self: *Router, method: Method, path: []const u8) !?*const Route 
 
         prev_routes.*.deinit();
         prev_routes.* = current_routes.*;
-        current_routes = @constCast(&(std.ArrayList(*const Route).init(self.allocator)));
+        current_routes = @constCast(&(std.array_list.Managed(*const Route).init(self.allocator)));
     }
 
     var j: u32 = 0;
@@ -118,7 +118,7 @@ pub fn getRoute(self: *Router, method: Method, path: []const u8) !?*const Route 
     return route;
 }
 
-fn dummyHandler(_: *const HttpRequest, _: *HttpResponse, _: mem.Allocator) anyerror!void {}
+fn dummyHandler(_: *const HttpRequest, _: *HttpResponse, _: std.Io,  _: mem.Allocator) anyerror!void {}
 
 test getRoute {
     var router: Router = .init(std.testing.allocator);

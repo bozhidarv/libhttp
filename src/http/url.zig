@@ -8,9 +8,9 @@ pub const ParseError = error{
 };
 
 raw_url: []const u8,
-path: std.ArrayList([]const u8),
+path: std.array_list.Managed([]const u8),
 query: std.StringHashMap([]const u8),
-params: ?*const std.ArrayList([]const u8),
+params: ?*const std.array_list.Managed([]const u8),
 
 const Url = @This();
 
@@ -29,7 +29,7 @@ pub fn parseUrl(raw_url: []const u8, host: ?[]const u8, allocator: *const mem.Al
         try parseQueryParams(url[query_start_idx..], &query_params);
     }
 
-    var path_arr: std.ArrayList([]const u8) = .init(allocator.*);
+    var path_arr: std.array_list.Managed([]const u8) = .init(allocator.*);
 
     var path_it = mem.splitSequence(u8, path_str[1..], "/");
 

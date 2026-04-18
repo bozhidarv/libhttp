@@ -2,6 +2,7 @@ const std = @import("std");
 const fmt = std.fmt;
 const mem = std.mem;
 const testing = std.testing;
+const Io = std.Io;
 
 const Status = @import("status.zig").Status;
 const headers_utils = @import("headers.zig");
@@ -14,13 +15,15 @@ status: Status,
 headers: HeadersMap,
 body: []u8,
 allocator: mem.Allocator,
+io: Io, 
 
-pub fn init(allocator: mem.Allocator) HttpResponse {
+pub fn init(allocator: mem.Allocator, io: Io) HttpResponse {
     return .{
         .status = Status.internal_server_error,
         .headers = .init(allocator),
         .body = "",
         .allocator = allocator,
+        .io = io
     };
 }
 
@@ -47,18 +50,22 @@ pub fn sendText(self: *HttpResponse, body: []const u8) !void {
     try self.setBody(body);
 }
 
-fn readEntireFile(file_path: []const u8, allocator: mem.Allocator) ![]u8 {
-    const file = try std.fs.openFileAbsolute(file_path, .{ .mode = .read_only });
-    defer file.close();
+fn readEntireFile(io: Io, file_path: []const u8, allocator: mem.Allocator) ![]u8 {
+    const file = try std.Io.Dir.openFileAbsolute(io, file_path, .{ .mode = .read_only });
+    defer file.close(io);
 
-    var buffered_reader = std.io.bufferedReader(file.reader());
-    var reader = buffered_reader.reader();
+    var buffer: [2048]u8 = undefined;
+    var file_reader = file.reader(io, &buffer);
+    var reader = &file_reader.interface;
 
-    return try reader.readAllAlloc(allocator, std.math.maxInt(usize));
+    var alloc_writer: Io.Writer.Allocating = .init(allocator);
+    _ = try reader.streamRemaining(&alloc_writer.writer);
+
+    return try alloc_writer.toOwnedSlice();
 }
 
 pub fn sendFile(self: *HttpResponse, file_name: []const u8) !void {
-    const file_contents = try readEntireFile(file_name, self.allocator);
+    const file_contents = try readEntireFile(self.io, file_name, self.allocator);
     defer self.allocator.free(file_contents);
 
     try self.headers.put(headers_utils.HeaderName.CONTENT_TYPE, headers_utils.ContentType.APPLICATION_OCTET_STREAM);
@@ -73,7 +80,7 @@ pub fn serialize(self: *HttpResponse) ![]const u8 {
 
     var headers_it = self.headers.raw_headers.iterator();
 
-    var list: std.ArrayList([]const u8) = .init(self.allocator);
+    var list: std.array_list.Managed([]const u8) = .init(self.allocator);
     defer {
         for (list.items) |ptr| {
             self.allocator.free(ptr);
@@ -116,7 +123,7 @@ pub fn deinit(self: *HttpResponse) void {
 }
 
 test serialize {
-    var response1: HttpResponse = .init(testing.allocator);
+    var response1: HttpResponse = .init(testing.allocator, testing.io);
     defer response1.deinit();
 
     response1.status = Status.ok;
@@ -125,9 +132,11 @@ test serialize {
     const response_ser1 = try response1.serialize();
     defer response1.allocator.free(response_ser1);
 
-    try testing.expect(mem.eql(u8, response_ser1, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n"));
+    // std.debug.print("{s}", .{response_ser1});
 
-    var response2: HttpResponse = .init(testing.allocator);
+    try testing.expect(mem.eql(u8, response_ser1, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 0\r\n\r\n"));
+
+    var response2: HttpResponse = .init(testing.allocator, testing.io);
     defer response2.deinit();
 
     response2.status = Status.ok;

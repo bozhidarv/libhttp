@@ -12,8 +12,10 @@ pub const headers = @import("http/headers.zig");
 pub const Server = @import("server/server.zig").Server;
 pub const Url = @import("http/url.zig");
 pub const encoder = @import("encoding/encoder.zig");
+pub const logger = @import("logger.zig");
 
-pub const version = "0.0.1";
+const config = @import("config");
+pub const version = config.version;
 
 const testing = std.testing;
 

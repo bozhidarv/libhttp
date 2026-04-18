@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const InMemmoryReader = @import("../utils/io_utils.zig").InMemmoryReader;
 const gzip = @import("gzip.zig");
 
 pub const Encoding = enum {
@@ -19,13 +18,13 @@ pub const Encoding = enum {
     }
 };
 
-pub fn encode(data: []const u8, encoding: Encoding, allocator: std.mem.Allocator) !std.ArrayList(u8) {
+pub fn encode(data: []const u8, encoding: Encoding, allocator: std.mem.Allocator) !std.array_list.Managed(u8) {
     return switch (encoding) {
         .gzip => gzip.encode(data, allocator),
     };
 }
 
-pub fn decode(data: []const u8, encoding: Encoding, allocator: std.mem.Allocator) !std.ArrayList(u8) {
+pub fn decode(data: []const u8, encoding: Encoding, allocator: std.mem.Allocator) !std.array_list.Managed(u8) {
     return switch (encoding) {
         .gzip => gzip.decode(data, allocator),
     };

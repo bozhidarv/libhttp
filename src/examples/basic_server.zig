@@ -2,30 +2,37 @@ const std = @import("std");
 const net = std.net;
 const mem = std.mem;
 const libhttp = @import("libhttp");
+const slog = std.log;
+const logger = libhttp.logger;
 
 var directory: ?[]const u8 = null;
 
-pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
+pub const std_options: std.Options = .{
+    // Set the log level to info
+    .log_level = logger.log_level,
 
-    const env_map = try arena.allocator().create(std.process.EnvMap);
-    env_map.* = try std.process.getEnvMap(arena.allocator());
+    // Define logFn to override the std implementation
+    .logFn = logger.stdErrLogger,
+};
+
+pub fn main(init: std.process.Init) !void {
+    const env_map = init.environ_map;
     defer env_map.deinit(); // technically unnecessary when using ArenaAllocator
 
-    var args = std.process.args(); //why does this only compile with "var"??
-    _ = args.skip(); //to skip the zig call
+    var args_iter = init.minimal.args.iterate(); //why does this only compile with "var"??
+    _ = args_iter.skip(); //to skip the zig call
     //
-    const flag_name = args.next() orelse "";
+    const flag_name = args_iter.next() orelse "";
     if (std.mem.eql(u8, flag_name, "--directory")) {
-        directory = args.next();
+        directory = args_iter.next();
     }
 
     const port_str = env_map.get("PORT") orelse "4221";
+    slog.info("App started on port: {s}", .{port_str});
 
     const port_parsed = try std.fmt.parseInt(u16, port_str, 10);
 
-    var server = libhttp.Server.init(arena.allocator());
+    var server = libhttp.Server.init(init.arena.allocator(), init.io);
 
     try server.router.addRoute(.GET, "/", &handleIndex);
     try server.router.addRoute(.GET, "/echo/{str}", &handleEcho);
@@ -36,16 +43,19 @@ pub fn main() !void {
     try server.start("127.0.0.1", port_parsed);
 }
 
-fn handleIndex(_: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, _: mem.Allocator) anyerror!void {
+fn handleIndex(_: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, _: std.Io, _: mem.Allocator) !void {
+    slog.info("Hit index page", .{});
     res.status = libhttp.HttpStatus.ok;
 }
 
-fn handleEcho(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, _: mem.Allocator) anyerror!void {
+fn handleEcho(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, _: std.Io, _: mem.Allocator) anyerror!void {
+    slog.info("Hit echo page", .{});
     res.status = libhttp.HttpStatus.ok;
     try res.sendText(req.url.params.?.items[0]);
 }
 
-fn handleWriteFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, allocator: mem.Allocator) anyerror!void {
+fn handleWriteFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, io: std.Io, allocator: mem.Allocator) anyerror!void {
+    slog.info("Hit write file page", .{});
     if (req.body == null) {
         return;
     }
@@ -54,13 +64,23 @@ fn handleWriteFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, 
     const path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ directory.?, file_name });
     defer allocator.free(path);
 
-    const file = try std.fs.createFileAbsolute(path, .{});
-    _ = try file.write(req.body.?);
+    const file = std.Io.Dir.createFileAbsolute(io, path, .{}) catch |e| {
+        slog.err("{any}", .{e});
+        return;
+    };
+    defer file.close(io);
+    var wbuffer: [1024]u8 = undefined;
+    var file_writer = file.writer(io, &wbuffer);
+    const writer = &file_writer.interface;
+
+    try writer.writeAll(req.body.?);
+    try writer.flush();
 
     res.status = libhttp.HttpStatus.created;
 }
 
-fn handleReadFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, allocator: mem.Allocator) anyerror!void {
+fn handleReadFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, _: std.Io, allocator: mem.Allocator) anyerror!void {
+    slog.info("Hit read file page", .{});
     const file_name = req.url.params.?.items[0];
 
     if (directory == null) {
@@ -69,6 +89,7 @@ fn handleReadFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, a
     }
 
     const path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ directory.?, file_name });
+    slog.info("File trying to be read is: {s}", .{path});
     defer allocator.free(path);
 
     res.sendFile(path) catch |err| switch (err) {
@@ -81,7 +102,8 @@ fn handleReadFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, a
     res.status = libhttp.HttpStatus.ok;
 }
 
-fn handleUserAgent(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, _: mem.Allocator) anyerror!void {
+fn handleUserAgent(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, _: std.Io, _: mem.Allocator) anyerror!void {
+    slog.info("Hit user agent page", .{});
     const user_agent = req.headers.get("user-agent");
 
     if (user_agent == null) {

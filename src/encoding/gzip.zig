@@ -1,40 +1,32 @@
 const std = @import("std");
-const gzip_compress = std.compress.gzip;
+const mem = std.mem;
+const flate = std.compress.flate;
 
-const reader_utils = @import("../utils/io_utils.zig");
+pub fn encode(data: []const u8, allocator: mem.Allocator) !std.array_list.Managed(u8) {
+    var arr: std.ArrayList(u8) = try .initCapacity(allocator, 12);
+    var allocating: std.Io.Writer.Allocating = .fromArrayList(allocator, &arr);
 
-pub fn encode(data: []const u8, allocator: std.mem.Allocator) !std.ArrayList(u8) {
-    var ctx = reader_utils.ReaderContext{
-        .pos = 0,
-        .str_ptr = @constCast(&data),
-    };
+    var buf: [flate.max_window_len]u8 = undefined;
+    var compressor = try flate.Compress.init(&allocating.writer, &buf, .gzip, .default);
+    try compressor.writer.writeAll(data);
+    try compressor.finish();
 
-    const reader:  reader_utils.InMemmoryReader = .{
-        .context = &ctx,
-    };
+    var out_arr = allocating.toArrayList();
+    const out_arr_managed = out_arr.toManaged(allocator);
 
-    var arr: std.ArrayList(u8) = .init(allocator);
-
-    try gzip_compress.compress(reader, arr.writer(), .{});
-
-    return arr;
+    return out_arr_managed;
 }
 
-pub fn decode(data: []const u8, allocator: std.mem.Allocator) !std.ArrayList(u8) {
-    var ctx = reader_utils.ReaderContext{
-        .pos = 0,
-        .str_ptr = @constCast(&data),
-    };
+pub fn decode(data: []const u8, allocator: mem.Allocator) !std.array_list.Managed(u8) {
+    var reader: std.Io.Reader = .fixed(data);
 
-    const reader: reader_utils.InMemmoryReader = .{
-        .context = &ctx,
-    };
+    var buf: [flate.max_window_len]u8 = undefined;
+    var decompressor = flate.Decompress.init(&reader, .gzip, &buf);
 
-    var arr: std.ArrayList(u8) = .init(allocator);
+    var arr: std.ArrayList(u8) = .empty;
+    try decompressor.reader.appendRemainingUnlimited(allocator, &arr);
 
-    try gzip_compress.decompress(reader, arr.writer());
-
-    return arr;
+    return arr.toManaged(allocator);
 }
 
 test encode {
@@ -45,6 +37,9 @@ test encode {
 
     const norm_arr = try decode(@as([]const u8, compressed_arr.items), std.testing.allocator);
     defer norm_arr.deinit();
+
+
+    // std.debug.print("{s}\n{s}", .{data, norm_arr.items});
 
     try std.testing.expect(std.mem.eql(u8, norm_arr.items, data));
 }

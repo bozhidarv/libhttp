@@ -18,7 +18,7 @@ allocator: mem.Allocator,
 raw_request: []const u8,
 body: ?[]const u8,
 
-pub fn setUrlParams(self: *HttpRequest, params: *const std.ArrayList([]const u8)) void {
+pub fn setUrlParams(self: *HttpRequest, params: *const std.array_list.Managed([]const u8)) void {
     self.url.params = params;
 }
 
