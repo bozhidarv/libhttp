@@ -8,6 +8,10 @@ const HttpResponse = @import("../http/response.zig");
 const HttpStatus = @import("../http/status.zig").Status;
 const slog = std.log;
 
+pub const Errors = error{HeaderTooLarge};
+
+pub const AcceptRequestError = Errors || Io.Reader.DelimiterError || Io.Writer.Error || HttpRequest.Error;
+
 const MAX_CONNS = 4096;
 
 pub const Server = struct {
@@ -45,72 +49,51 @@ pub const Server = struct {
 
         var closed = false;
         while (!closed) {
-            var allocator = @constCast(&arena).allocator();
+            var allocator: std.mem.Allocator = @constCast(&arena).allocator();
             defer if (!closed) {
                 _ = @constCast(&arena).reset(.free_all);
             };
 
-            var req_buffer: [4096]u8 = undefined;
+            var req_buffer: [8192]u8 = undefined;
             var req_writer: Io.Writer = .fixed(&req_buffer);
-            const read_data = reader.stream(&req_writer, .limited(4096)) catch |err| switch (err) {
-                Io.Reader.StreamError.EndOfStream => {
+
+            var req: HttpRequest = .init_simple(allocator);
+
+            var request_line_parsed = false;
+            var curr_pos: usize = 0;
+            while (true) {
+                const curr_line_len = reader.streamDelimiter(&req_writer, '\n') catch |err| switch (err) {
+                    Io.Reader.StreamError.EndOfStream => 0,
+                    else => return err,
+                };
+                reader.toss(1);
+
+                slog.debug("Read {d} bytes", .{curr_line_len});
+                const is_req_end = req_writer.end >= 2 and req_buffer[req_writer.end - 2] == '\r' and req_buffer[req_writer.end - 1] == '\r';
+                if (is_req_end or curr_line_len == 0) {
                     break;
-                },
-                else => return err,
-            };
-            var req_raw: std.ArrayList(u8) = req_writer.toArrayList();
-            defer req_raw.deinit(allocator);
+                }
 
-            slog.info("Read {d} bytes", .{read_data});
-            // slog.info("the request has length of {d} bytes", .{req_raw.items.len});
-            // while (true) {
-            //     const req_buffer = reader.stream(1) catch |err| switch (err) {
-            //         error.EndOfStream => {
-            //             break;
-            //         },
-            //         else => return err,
-            //     };
-            //     try req_raw.append(req_buffer[0]);
-            //     if (req_raw.items.len >= 4 and std.mem.eql(u8, req_raw.items[req_raw.items.len-4..], "\r\n\r\n")) {
-            //         break;
-            //     }
-            // }
+                const end_pos = curr_pos + curr_line_len - 1;
+                const curr_line = req_buffer[curr_pos..end_pos];
+                curr_pos = req_writer.end;
 
-            // Parse Content-Length and read the body if present.
-            // var content_length: usize = 0;
-            // var header_lines = std.mem.splitSequence(u8, req_raw.items, "\r\n");
-            // _ = header_lines.first();
-            // while (header_lines.next()) |line| {
-            //     if (line.len == 0) break;
-            //     if (std.mem.startsWith(u8, line, "Content-Length: ")) {
-            //         content_length = std.fmt.parseInt(usize, line["Content-Length: ".len..], 10) catch 0;
-            //         break;
-            //     }
-            // }
-            // if (content_length > 0) {
-            //     const header_end = req_raw.items.len;
-            //     try req_raw.resize(allocator, header_end + content_length);
-            //     var remaining = content_length;
-            //     while (remaining > 0) {
-            //         const to_read = @min(remaining, rbuffer.len);
-            //         reader.fill(to_read) catch |err| switch (err) {
-            //             Io.Reader.Error.EndOfStream => return,
-            //             else => return err,
-            //         };
-            //         const offset = header_end + (content_length - remaining);
-            //         @memcpy(req_raw.items[offset..][0..to_read], rbuffer[0..to_read]);
-            //         remaining -= to_read;
-            //         reader.tossBuffered();
-            //     }
-            // }
+                if (!request_line_parsed) {
+                    try req.parseRequestLine(curr_line);
+                    request_line_parsed = true;
+                    continue;
+                }
+                try req.parseHeader(curr_line);
+            }
 
-            var req: HttpRequest = try .init(req_raw.items, allocator);
-            defer req.deinit();
+            const content_length_h = req.headers.get("Content-Length");
+            if (content_length_h) |_| {
+                req.body_reader = reader;
+            }
 
             const conn_header = req.headers.get("Connection");
 
             var res: HttpResponse = .init(allocator, io);
-            defer res.deinit();
 
             if (conn_header == null or (conn_header != null and std.mem.eql(u8, conn_header.?, "close"))) {
                 closed = true;

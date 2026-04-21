@@ -56,9 +56,12 @@ fn handleEcho(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, _: st
 
 fn handleWriteFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, io: std.Io, allocator: mem.Allocator) anyerror!void {
     slog.info("Hit write file page", .{});
-    if (req.body == null) {
+    if (req.body_reader == null) {
         return;
     }
+
+    const body_len = try std.fmt.parseUnsigned(usize, req.headers.get("Content-Length").?, 10);
+    slog.debug("File body length: {d}", .{ body_len });
 
     const file_name = req.url.params.?.items[0];
     const path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ directory.?, file_name });
@@ -73,7 +76,7 @@ fn handleWriteFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, 
     var file_writer = file.writer(io, &wbuffer);
     const writer = &file_writer.interface;
 
-    try writer.writeAll(req.body.?);
+    try req.body_reader.?.streamExact(writer, body_len);
     try writer.flush();
 
     res.status = libhttp.HttpStatus.created;

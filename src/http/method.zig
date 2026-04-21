@@ -1,6 +1,7 @@
 //! HTTP method definitions and utilities
 
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 /// Standard HTTP methods as defined in RFC 7231
 pub const Method = enum {
@@ -15,7 +16,7 @@ pub const Method = enum {
     PATCH,
 
     /// Convert string to HTTP method
-    pub fn fromString(str: []const u8, alloc: std.mem.Allocator) !?Method { 
+    pub fn fromString(str: []const u8, alloc: Allocator) error{OutOfMemory}!?Method { 
         var strUpper = try alloc.alloc(u8, str.len);
         defer alloc.free(strUpper);
         for (str, 0..) |ch, i| {

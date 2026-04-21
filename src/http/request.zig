@@ -1,68 +1,71 @@
-const std = @import("std");
-const Url = @import("url.zig");
-const Method = @import("method.zig").Method;
-const HeadersMap = @import("headers.zig").UnmanagedHeadersMap;
 const mem = std.mem;
+const Io = std.Io;
+const testing = std.testing;
 
-pub const HttpError = error{
-    ParsingError,
-};
+const HeadersMap = @import("headers.zig").UnmanagedHeadersMap;
+const Method = @import("method.zig").Method;
+const Url = @import("url.zig");
 
-pub const HttpRequest = @This();
+const std = @import("std");
+
+pub const Error = HeaderError || RequstLineError;
+
+const HttpRequest = @This();
 
 method: Method,
 headers: HeadersMap,
 url: Url,
 version: []const u8,
 allocator: mem.Allocator,
-raw_request: []const u8,
-body: ?[]const u8,
+body_reader: ?*Io.Reader,
 
 pub fn setUrlParams(self: *HttpRequest, params: *const std.array_list.Managed([]const u8)) void {
     self.url.params = params;
 }
 
-pub fn init(req: []const u8, allocator: mem.Allocator) !HttpRequest {
-    const req_copy = try allocator.alloc(u8, req.len);
-    @memcpy(req_copy, req);
+const HeaderError = error {InvalidHeader} || mem.Allocator.Error;
 
-    var it = mem.splitSequence(u8, req_copy, "\r\n");
+pub fn parseHeader(self: *HttpRequest, header_line: []const u8) HeaderError!void {
+    var header_it = mem.splitSequence(u8, header_line, ": ");
 
-    const req_line = it.first();
+    const header_name = header_it.next() orelse return HeaderError.InvalidHeader;
+    const header_value = header_it.next() orelse return HeaderError.InvalidHeader;
 
-    var req_it = mem.splitSequence(u8, req_line, " ");
-
-    var headers = try HeadersMap.parseHeaders(&it, allocator);
-
-    var req_part = req_it.next() orelse return HttpError.ParsingError;
-
-    const method = try Method.fromString(req_part, allocator) orelse return HttpError.ParsingError;
-
-    req_part = req_it.next() orelse return HttpError.ParsingError;
-
-    const host = headers.get("Host");
-    const url = try Url.parseUrl(req_part, host, &allocator);
-
-    req_part = req_it.next() orelse return HttpError.ParsingError;
-
-    const httpVersion = req_part;
-    var body: ?[]const u8 = null;
-
-    const length_str = headers.get("Content-Length");
-    if (headers.contains("Content-Type") and length_str != null and it.index != null) {
-        const length = try std.fmt.parseInt(usize, length_str.?, 10);
-        body = req[it.index.? .. it.index.? + length];
+    if (header_it.peek() != null) {
+        return HeaderError.InvalidHeader;
     }
 
+    try self.headers.put(header_name, header_value);
+}
+
+pub fn init_simple(allocator: mem.Allocator) HttpRequest {
     return .{
-        .method = method,
-        .headers = headers,
-        .url = url,
-        .version = httpVersion,
+        .method = undefined,
+        .headers = .init(allocator),
+        .url = undefined,
+        .version = undefined,
         .allocator = allocator,
-        .raw_request = req_copy,
-        .body = body,
+        .body_reader = null,
     };
+}
+
+const RequstLineError = error{InvalidRequestLine} || mem.Allocator.Error || Url.ParseError;
+
+pub fn parseRequestLine(self: *HttpRequest, req_line: []const u8) RequstLineError!void {
+    var req_it = mem.splitSequence(u8, req_line, " ");
+
+    const http_method_str = req_it.next() orelse return RequstLineError.InvalidRequestLine;
+    self.method = try Method.fromString(http_method_str, self.allocator) orelse return RequstLineError.InvalidRequestLine;
+
+    const url_str = req_it.next() orelse return RequstLineError.InvalidRequestLine;
+    self.url = try Url.parseUrl(url_str, null, &self.allocator);
+
+    self.version = req_it.next() orelse return RequstLineError.InvalidRequestLine;
+    self.version = mem.trim(u8, self.version, " \n\r");
+
+    if (req_it.peek() != null) {
+        return RequstLineError.InvalidRequestLine;
+    }
 }
 
 pub fn deinit(self: *HttpRequest) void {
@@ -74,6 +77,30 @@ pub fn deinit(self: *HttpRequest) void {
 
     self.url.path.deinit();
     self.url.query.deinit();
-    self.allocator.free(self.raw_request);
     self.allocator.free(self.version);
+}
+
+test "parseHeader" {
+    var arena: std.heap.ArenaAllocator = .init(testing.allocator);
+    defer arena.deinit();
+    const header_str = "Content-Type: application/json";
+
+    var req: HttpRequest = .init_simple(arena.allocator());
+
+    try req.parseHeader(header_str);
+
+    try testing.expect(req.headers.contains("Content-Type"));
+}
+
+test "parseRequestLine" {
+    var arena: std.heap.ArenaAllocator = .init(testing.allocator);
+    defer arena.deinit();
+    const req_str = "POST /api/users HTTP/1.1";
+
+    var req: HttpRequest = .init_simple(arena.allocator());
+
+    try req.parseRequestLine(req_str);
+
+    try testing.expect(req.method == .POST);
+    try testing.expect(mem.eql(u8, req.version, "HTTP/1.1"));
 }

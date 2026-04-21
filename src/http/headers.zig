@@ -1,6 +1,8 @@
 //! HTTP header utilities and common header definitions
 
 const std = @import("std");
+const mem = std.mem;
+
 pub const HeaderName = struct {
     pub const CONTENT_TYPE = "Content-Type";
     pub const CONTENT_LENGTH = "Content-Length";
@@ -44,7 +46,7 @@ pub fn HeadersMap(comptime T: type) type {
         }
 
         ///Initializes and parses headers from splitIterator
-        pub fn parseHeaders(lines: *std.mem.SplitIterator(u8, .sequence), allocator: std.mem.Allocator) !HeadersMap(T) {
+        pub fn parseHeaders(lines: *mem.SplitIterator(u8, .sequence), allocator: mem.Allocator) mem.Allocator.Error!HeadersMap(T) {
             var headers: HeadersMap(T) = .init(allocator);
             while (lines.next()) |line| {
                 if (std.mem.eql(u8, line, "")) {
@@ -61,7 +63,7 @@ pub fn HeadersMap(comptime T: type) type {
             return headers;
         }
 
-        pub fn put(self: *HeadersMap(T), name: []const u8, value: []const u8) !void {
+        pub fn put(self: *HeadersMap(T), name: []const u8, value: []const u8) mem.Allocator.Error!void {
             if (self.get(name) == null) {
                 try self.raw_headers.put(name, value);
             }

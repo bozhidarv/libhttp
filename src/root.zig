@@ -3,7 +3,7 @@
 //! start with main.zig instead.
 const std = @import("std");
 
-pub const HttpRequest = @import("http/request.zig").HttpRequest;
+pub const HttpRequest = @import("http/request.zig");
 pub const HttpResponse = @import("http/response.zig").HttpResponse;
 pub const Router = @import("server/router.zig").Router;
 pub const HttpMethod = @import("http/method.zig").Method;

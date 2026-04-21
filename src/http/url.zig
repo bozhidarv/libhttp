@@ -5,7 +5,7 @@ pub const ParseError = error{
     InvalidUrl,
     InvalidScheme,
     InvalidHost,
-};
+} || mem.Allocator.Error;
 
 raw_url: []const u8,
 path: std.array_list.Managed([]const u8),
@@ -14,7 +14,7 @@ params: ?*const std.array_list.Managed([]const u8),
 
 const Url = @This();
 
-pub fn parseUrl(raw_url: []const u8, host: ?[]const u8, allocator: *const mem.Allocator) !Url {
+pub fn parseUrl(raw_url: []const u8, host: ?[]const u8, allocator: *const mem.Allocator) ParseError!Url {
     var url = raw_url[0..];
 
     const startIdx = try trimUnnecessaryUrlInfo(url, host);
@@ -45,7 +45,7 @@ pub fn parseUrl(raw_url: []const u8, host: ?[]const u8, allocator: *const mem.Al
     };
 }
 
-fn trimUnnecessaryUrlInfo(url: []const u8, host: ?[]const u8) !usize {
+fn trimUnnecessaryUrlInfo(url: []const u8, host: ?[]const u8) ParseError!usize {
     var new_start_idx: usize = 0;
     if (mem.startsWith(u8, url, "http")) {
         if (url[4] == 's') {
@@ -65,7 +65,7 @@ fn trimUnnecessaryUrlInfo(url: []const u8, host: ?[]const u8) !usize {
     return new_start_idx;
 }
 
-fn parseQueryParams(url: []const u8, query_params: *std.StringHashMap([]const u8)) !void {
+fn parseQueryParams(url: []const u8, query_params: *std.StringHashMap([]const u8)) mem.Allocator.Error!void {
     var query_it = mem.splitSequence(u8, url, "&");
     while (query_it.next()) |query_raw| {
         var query_split = mem.splitSequence(u8, query_raw, "=");
