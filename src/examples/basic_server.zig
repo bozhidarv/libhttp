@@ -32,7 +32,7 @@ pub fn main(init: std.process.Init) !void {
 
     const port_parsed = try std.fmt.parseInt(u16, port_str, 10);
 
-    var server = libhttp.Server.init(init.arena.allocator(), init.io);
+    var server = libhttp.Server.init(init.gpa, init.io);
 
     try server.router.addRoute(.GET, "/", &handleIndex);
     try server.router.addRoute(.GET, "/echo/{str}", &handleEcho);
