@@ -56,7 +56,7 @@ fn acceptRequest(io: Io, arena: std.heap.ArenaAllocator, router: *Router, client
         var req_buffer: [8192]u8 = undefined;
         var req_writer: Io.Writer = .fixed(&req_buffer);
 
-        var req: HttpRequest = .init_simple(allocator);
+        var req: HttpRequest = .init(allocator);
 
         var request_line_parsed = false;
         var curr_pos: usize = 0;

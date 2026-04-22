@@ -38,7 +38,7 @@ pub fn parseHeader(self: *HttpRequest, header_line: []const u8) HeaderError!void
     try self.headers.put(header_name, header_value);
 }
 
-pub fn init_simple(allocator: mem.Allocator) HttpRequest {
+pub fn init(allocator: mem.Allocator) HttpRequest {
     return .{
         .method = undefined,
         .headers = .init(allocator),
@@ -85,7 +85,7 @@ test "parseHeader" {
     defer arena.deinit();
     const header_str = "Content-Type: application/json";
 
-    var req: HttpRequest = .init_simple(arena.allocator());
+    var req: HttpRequest = .init(arena.allocator());
 
     try req.parseHeader(header_str);
 
@@ -96,7 +96,7 @@ test "parseHeader stores value" {
     var arena: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
 
-    var req: HttpRequest = .init_simple(arena.allocator());
+    var req: HttpRequest = .init(arena.allocator());
     try req.parseHeader("Content-Type: application/json");
 
     try testing.expectEqualStrings("application/json", req.headers.get("Content-Type").?);
@@ -106,7 +106,7 @@ test "parseHeader invalid - missing separator" {
     var arena: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
 
-    var req: HttpRequest = .init_simple(arena.allocator());
+    var req: HttpRequest = .init(arena.allocator());
     try testing.expectError(HeaderError.InvalidHeader, req.parseHeader("Content-Type"));
 }
 
@@ -114,7 +114,7 @@ test "parseHeader invalid - multiple separators" {
     var arena: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
 
-    var req: HttpRequest = .init_simple(arena.allocator());
+    var req: HttpRequest = .init(arena.allocator());
     try testing.expectError(HeaderError.InvalidHeader, req.parseHeader("Content-Type: text/plain: extra"));
 }
 
@@ -122,7 +122,7 @@ test "parseHeader case insensitive lookup" {
     var arena: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
 
-    var req: HttpRequest = .init_simple(arena.allocator());
+    var req: HttpRequest = .init(arena.allocator());
     try req.parseHeader("Authorization: Bearer token123");
 
     try testing.expectEqualStrings("Bearer token123", req.headers.get("authorization").?);
@@ -132,7 +132,7 @@ test "parseHeader multiple headers" {
     var arena: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
 
-    var req: HttpRequest = .init_simple(arena.allocator());
+    var req: HttpRequest = .init(arena.allocator());
     try req.parseHeader("Content-Type: text/plain");
     try req.parseHeader("Content-Length: 42");
     try req.parseHeader("Host: localhost:8080");
@@ -148,7 +148,7 @@ test "parseRequestLine" {
     defer arena.deinit();
     const req_str = "POST /api/users HTTP/1.1";
 
-    var req: HttpRequest = .init_simple(arena.allocator());
+    var req: HttpRequest = .init(arena.allocator());
 
     try req.parseRequestLine(req_str);
 
@@ -170,7 +170,7 @@ test "parseRequestLine all methods" {
         var arena: std.heap.ArenaAllocator = .init(testing.allocator);
         defer arena.deinit();
 
-        var req: HttpRequest = .init_simple(arena.allocator());
+        var req: HttpRequest = .init(arena.allocator());
         try req.parseRequestLine(case[0]);
         try testing.expect(req.method == case[1]);
     }
@@ -180,7 +180,7 @@ test "parseRequestLine parses url path" {
     var arena: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
 
-    var req: HttpRequest = .init_simple(arena.allocator());
+    var req: HttpRequest = .init(arena.allocator());
     try req.parseRequestLine("GET /api/users/123 HTTP/1.1");
 
     try testing.expect(req.url.path.items.len == 3);
@@ -193,7 +193,7 @@ test "parseRequestLine parses query params" {
     var arena: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
 
-    var req: HttpRequest = .init_simple(arena.allocator());
+    var req: HttpRequest = .init(arena.allocator());
     try req.parseRequestLine("GET /search?q=hello&page=2 HTTP/1.1");
 
     try testing.expect(req.url.query.count() == 2);
@@ -204,7 +204,7 @@ test "parseRequestLine HTTP/1.0" {
     var arena: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
 
-    var req: HttpRequest = .init_simple(arena.allocator());
+    var req: HttpRequest = .init(arena.allocator());
     try req.parseRequestLine("GET / HTTP/1.0");
 
     try testing.expectEqualStrings("HTTP/1.0", req.version);
@@ -214,7 +214,7 @@ test "parseRequestLine invalid - missing version" {
     var arena: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
 
-    var req: HttpRequest = .init_simple(arena.allocator());
+    var req: HttpRequest = .init(arena.allocator());
     try testing.expectError(RequstLineError.InvalidRequestLine, req.parseRequestLine("GET /path"));
 }
 
@@ -222,7 +222,7 @@ test "parseRequestLine invalid - unknown method" {
     var arena: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
 
-    var req: HttpRequest = .init_simple(arena.allocator());
+    var req: HttpRequest = .init(arena.allocator());
     try testing.expectError(RequstLineError.InvalidRequestLine, req.parseRequestLine("BREW /coffee HTTP/1.1"));
 }
 
@@ -230,7 +230,7 @@ test "parseRequestLine invalid - too many parts" {
     var arena: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
 
-    var req: HttpRequest = .init_simple(arena.allocator());
+    var req: HttpRequest = .init(arena.allocator());
     try testing.expectError(RequstLineError.InvalidRequestLine, req.parseRequestLine("GET /path HTTP/1.1 extra"));
 }
 
@@ -238,6 +238,6 @@ test "init_simple sets body_reader to null" {
     var arena: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
 
-    const req: HttpRequest = .init_simple(arena.allocator());
+    const req: HttpRequest = .init(arena.allocator());
     try testing.expect(req.body_reader == null);
 }
