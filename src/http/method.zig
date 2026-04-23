@@ -16,13 +16,13 @@ pub const Method = enum {
     PATCH,
 
     /// Convert string to HTTP method
-    pub fn fromString(str: []const u8, alloc: Allocator) error{OutOfMemory}!?Method { 
-        var strUpper = try alloc.alloc(u8, str.len);
-        defer alloc.free(strUpper);
-        for (str, 0..) |ch, i| {
-            strUpper[i] = std.ascii.toUpper(ch);
+    pub fn fromString(str: []const u8) ?Method { 
+        const method_len: usize = @min(str.len, 7);
+        var str_upper: [7]u8 = undefined;
+        for (str, 0..method_len) |ch, i| {
+            str_upper[i] = std.ascii.toUpper(ch);
         }
-        const method = std.meta.stringToEnum(Method, strUpper);
+        const method = std.meta.stringToEnum(Method, str_upper[0..method_len]);
         return method;
     }
 
@@ -57,9 +57,9 @@ pub const Method = enum {
 };
 
 test "method from string" {
-    try std.testing.expect(try Method.fromString("GET", std.testing.allocator) == .GET);
-    try std.testing.expect(try Method.fromString("POST", std.testing.allocator) == .POST);
-    try std.testing.expect(try Method.fromString("INVALID", std.testing.allocator) == null);
+    try std.testing.expect(Method.fromString("GET") == .GET);
+    try std.testing.expect(Method.fromString("POST") == .POST);
+    try std.testing.expect(Method.fromString("INVALID") == null);
 }
 
 test "method properties" {

@@ -55,7 +55,7 @@ pub fn parseRequestLine(self: *HttpRequest, req_line: []const u8) RequstLineErro
     var req_it = mem.splitSequence(u8, req_line, " ");
 
     const http_method_str = req_it.next() orelse return RequstLineError.InvalidRequestLine;
-    self.method = try Method.fromString(http_method_str, self.allocator) orelse return RequstLineError.InvalidRequestLine;
+    self.method = Method.fromString(http_method_str) orelse return RequstLineError.InvalidRequestLine;
 
     const url_str = req_it.next() orelse return RequstLineError.InvalidRequestLine;
     self.url = try Url.parseUrl(url_str, null, &self.allocator);
