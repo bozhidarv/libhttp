@@ -3,7 +3,7 @@
 const std = @import("std");
 const mem = std.mem;
 
-pub const HeaderName = struct {
+pub const Name = struct {
     pub const CONTENT_TYPE = "Content-Type";
     pub const CONTENT_LENGTH = "Content-Length";
     pub const CONTENT_ENCODING = "Content-Encoding";
@@ -45,24 +45,6 @@ pub fn HeadersMap(comptime T: type) type {
             self.raw_headers.deinit();
         }
 
-        ///Initializes and parses headers from splitIterator
-        pub fn parseHeaders(lines: *mem.SplitIterator(u8, .sequence), allocator: mem.Allocator) mem.Allocator.Error!HeadersMap(T) {
-            var headers: HeadersMap(T) = .init(allocator);
-            while (lines.next()) |line| {
-                if (std.mem.eql(u8, line, "")) {
-                    break;
-                }
-
-                if (std.mem.indexOf(u8, line, ": ")) |colon_pos| {
-                    const name = line[0..colon_pos];
-                    const value = line[colon_pos + 2 ..];
-                    try headers.raw_headers.put(name, value);
-                }
-            }
-
-            return headers;
-        }
-
         pub fn put(self: *HeadersMap(T), name: []const u8, value: []const u8) mem.Allocator.Error!void {
             if (self.get(name) == null) {
                 try self.raw_headers.put(name, value);
@@ -73,12 +55,10 @@ pub fn HeadersMap(comptime T: type) type {
             return self.raw_headers.count();
         }
 
-        ///Checks if  header exists (case insensitive)
         pub fn contains(self: *const HeadersMap(T), name: []const u8) bool {
             return self.get(name) != null;
         }
 
-        ///Gets header value by key (case insensitive)
         pub fn get(self: *const HeadersMap(T), name: []const u8) ?[]const u8 {
             if (self.raw_headers.get(name)) |value| {
                 return value;
@@ -93,16 +73,17 @@ pub fn HeadersMap(comptime T: type) type {
 
             return null;
         }
+
+        pub fn getInt(self: *const HeadersMap(T), comptime IntT: type, name: []const u8) (std.fmt.ParseIntError || error{InvalidType})!?IntT {
+            switch (@typeInfo(IntT)) {
+                .int => {
+                    const value = self.get(name) orelse return null;
+                    return try std.fmt.parseInt(IntT, value, 10);
+                },
+                else => return error.InvalidType
+            }
+        }
     };
-}
-
-test "header parsing" {
-    var lines = std.mem.splitSequence(u8, "Content-Type: text/plain\r\nContent-Length: 5\r\n\r\n", "\r\n");
-    var headers = try HeadersMap(std.StringHashMap([]const u8)).parseHeaders(&lines, std.testing.allocator);
-    defer headers.deinit();
-
-    try std.testing.expectEqualStrings("text/plain", headers.get("Content-Type").?);
-    try std.testing.expectEqualStrings("5", headers.get("Content-Length").?);
 }
 
 test "case insensitive header lookup" {
@@ -113,4 +94,33 @@ test "case insensitive header lookup" {
 
     try std.testing.expectEqualStrings("text/plain", headers.get("content-type").?);
     try std.testing.expectEqualStrings("text/plain", headers.get("CONTENT-TYPE").?);
+}
+
+test "getInt functionality" {
+    var headers = HeadersMap(std.StringHashMap([]const u8)).init(std.testing.allocator);
+    defer headers.deinit();
+
+    try headers.put("Content-Length", "1024");
+    try headers.put("Negative-Value", "-42");
+    try headers.put("Invalid-Value", "not_a_number");
+
+    // Valid positive integer
+    const length = try headers.getInt(usize, "Content-Length");
+    try std.testing.expectEqual(@as(usize, 1024), length.?);
+
+    // Valid negative integer
+    const negative = try headers.getInt(i32, "Negative-Value");
+    try std.testing.expectEqual(@as(i32, -42), negative.?);
+
+    // Missing header
+    const missing = try headers.getInt(usize, "Missing-Header");
+    try std.testing.expectEqual(@as(?usize, null), missing);
+
+    // Invalid character in integer
+    const err = headers.getInt(usize, "Invalid-Value");
+    try std.testing.expectError(error.InvalidCharacter, err);
+
+    // Invalid type (non-integer)
+    const type_err = headers.getInt(f32, "Content-Length");
+    try std.testing.expectError(error.InvalidType, type_err);
 }

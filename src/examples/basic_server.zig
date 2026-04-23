@@ -4,6 +4,7 @@ const mem = std.mem;
 const libhttp = @import("libhttp");
 const slog = std.log;
 const logger = libhttp.logger;
+const headers = libhttp.headers;
 
 var directory: ?[]const u8 = null;
 
@@ -60,8 +61,8 @@ fn handleWriteFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, 
         return;
     }
 
-    const body_len = try std.fmt.parseUnsigned(usize, req.headers.get("Content-Length").?, 10);
-    slog.debug("File body length: {d}", .{ body_len });
+    const body_len = try req.headers.getInt(usize, headers.HeaderName.CONTENT_LENGTH);
+    slog.debug("File body length: {d}", .{ body_len.? });
 
     const file_name = req.url.params.?.items[0];
     const path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ directory.?, file_name });
@@ -76,7 +77,7 @@ fn handleWriteFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, 
     var file_writer = file.writer(io, &wbuffer);
     const writer = &file_writer.interface;
 
-    try req.body_reader.?.streamExact(writer, body_len);
+    try req.body_reader.?.streamExact(writer, body_len.?);
     try writer.flush();
 
     res.status = libhttp.HttpStatus.created;

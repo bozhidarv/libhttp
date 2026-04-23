@@ -68,7 +68,7 @@ pub fn sendFile(self: *HttpResponse, file_name: []const u8) !void {
     const file_contents = try readEntireFile(self.io, file_name, self.allocator);
     defer self.allocator.free(file_contents);
 
-    try self.headers.put(headers_utils.HeaderName.CONTENT_TYPE, headers_utils.ContentType.APPLICATION_OCTET_STREAM);
+    try self.headers.put(headers_utils.Name.CONTENT_TYPE, headers_utils.ContentType.APPLICATION_OCTET_STREAM);
 
     try self.setBody(file_contents);
 }
