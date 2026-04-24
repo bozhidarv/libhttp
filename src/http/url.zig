@@ -49,7 +49,6 @@ pub fn parse(self: *Url, host: ?[]const u8) ParseError!void {
     }
 }
 
-//TODO Seperate Url parsing into 2 steps: basic without host checks and param checks and query param checks. Do these only when needed.
 pub fn initParse(raw_url: []const u8, host: ?[]const u8, allocator: *const mem.Allocator) ParseError!Url {
     var url: Url = .init(raw_url, allocator);
     try url.parse(host);
