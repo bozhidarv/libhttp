@@ -8,7 +8,7 @@ const Url = @import("url.zig");
 
 const std = @import("std");
 
-pub const Error = HeaderError || RequstLineError;
+pub const Error = HeaderError || RequestLineError;
 
 const HttpRequest = @This();
 
@@ -49,22 +49,22 @@ pub fn init(allocator: mem.Allocator) HttpRequest {
     };
 }
 
-const RequstLineError = error{InvalidRequestLine} || mem.Allocator.Error || Url.ParseError;
+const RequestLineError = error{InvalidRequestLine} || mem.Allocator.Error;
 
-pub fn parseRequestLine(self: *HttpRequest, req_line: []const u8) RequstLineError!void {
+pub fn parseRequestLine(self: *HttpRequest, req_line: []const u8) RequestLineError!void {
     var req_it = mem.splitSequence(u8, req_line, " ");
 
-    const http_method_str = req_it.next() orelse return RequstLineError.InvalidRequestLine;
-    self.method = Method.fromString(http_method_str) orelse return RequstLineError.InvalidRequestLine;
+    const http_method_str = req_it.next() orelse return RequestLineError.InvalidRequestLine;
+    self.method = Method.fromString(http_method_str) orelse return RequestLineError.InvalidRequestLine;
 
-    const url_str = req_it.next() orelse return RequstLineError.InvalidRequestLine;
-    self.url = try Url.parseUrl(url_str, null, &self.allocator);
+    const url_str = req_it.next() orelse return RequestLineError.InvalidRequestLine;
+    self.url = Url.init(url_str, &self.allocator);
 
-    self.version = req_it.next() orelse return RequstLineError.InvalidRequestLine;
+    self.version = req_it.next() orelse return RequestLineError.InvalidRequestLine;
     self.version = mem.trim(u8, self.version, " \n\r");
 
     if (req_it.peek() != null) {
-        return RequstLineError.InvalidRequestLine;
+        return RequestLineError.InvalidRequestLine;
     }
 }
 
@@ -215,7 +215,7 @@ test "parseRequestLine invalid - missing version" {
     defer arena.deinit();
 
     var req: HttpRequest = .init(arena.allocator());
-    try testing.expectError(RequstLineError.InvalidRequestLine, req.parseRequestLine("GET /path"));
+    try testing.expectError(RequestLineError.InvalidRequestLine, req.parseRequestLine("GET /path"));
 }
 
 test "parseRequestLine invalid - unknown method" {
@@ -223,7 +223,7 @@ test "parseRequestLine invalid - unknown method" {
     defer arena.deinit();
 
     var req: HttpRequest = .init(arena.allocator());
-    try testing.expectError(RequstLineError.InvalidRequestLine, req.parseRequestLine("BREW /coffee HTTP/1.1"));
+    try testing.expectError(RequestLineError.InvalidRequestLine, req.parseRequestLine("BREW /coffee HTTP/1.1"));
 }
 
 test "parseRequestLine invalid - too many parts" {
@@ -231,7 +231,7 @@ test "parseRequestLine invalid - too many parts" {
     defer arena.deinit();
 
     var req: HttpRequest = .init(arena.allocator());
-    try testing.expectError(RequstLineError.InvalidRequestLine, req.parseRequestLine("GET /path HTTP/1.1 extra"));
+    try testing.expectError(RequestLineError.InvalidRequestLine, req.parseRequestLine("GET /path HTTP/1.1 extra"));
 }
 
 test "init_simple sets body_reader to null" {

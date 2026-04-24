@@ -22,7 +22,7 @@ pub fn main(init: std.process.Init) !void {
 
     var args_iter = init.minimal.args.iterate(); //why does this only compile with "var"??
     _ = args_iter.skip(); //to skip the zig call
-    //
+    
     const flag_name = args_iter.next() orelse "";
     if (std.mem.eql(u8, flag_name, "--directory")) {
         directory = args_iter.next();
@@ -61,7 +61,7 @@ fn handleWriteFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, 
         return;
     }
 
-    const body_len = try req.headers.getInt(usize, headers.HeaderName.CONTENT_LENGTH);
+    const body_len = try req.headers.getInt(usize, headers.Name.CONTENT_LENGTH);
     slog.debug("File body length: {d}", .{ body_len.? });
 
     const file_name = req.url.params.?.items[0];

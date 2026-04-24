@@ -7,6 +7,7 @@ const HttpRequest = @import("../http/request.zig");
 const HttpResponse = @import("../http/response.zig");
 const HttpStatus = @import("../http/status.zig").Status;
 const slog = std.log;
+const headers = @import("../http/headers.zig");
 
 pub const Errors = error{HeaderTooLarge};
 
@@ -67,7 +68,6 @@ fn acceptRequest(io: Io, arena: std.heap.ArenaAllocator, router: *Router, client
             };
             reader.toss(1);
 
-            slog.debug("Read {d} bytes", .{curr_line_len});
             const is_req_end = req_writer.end >= 2 and req_buffer[req_writer.end - 2] == '\r' and req_buffer[req_writer.end - 1] == '\r';
             if (is_req_end or curr_line_len == 0) {
                 break;
@@ -85,24 +85,26 @@ fn acceptRequest(io: Io, arena: std.heap.ArenaAllocator, router: *Router, client
             try req.parseHeader(curr_line);
         }
 
-        const content_length_h = req.headers.get("Content-Length");
+        const content_length_h = req.headers.get(headers.Name.CONTENT_LENGTH);
         if (content_length_h) |_| {
             req.body_reader = reader;
         }
 
-        const conn_header = req.headers.get("Connection");
+        const conn_header = req.headers.get(headers.Name.CONNECTION);
 
         var res: HttpResponse = .init(allocator, io);
 
         if (conn_header == null or (conn_header != null and std.mem.eql(u8, conn_header.?, "close"))) {
             closed = true;
-            try res.headers.put("Connection", "close");
+            try res.headers.put(headers.Name.CONNECTION, "close");
         }
 
-        const encoding = req.headers.get("Accept-Encoding");
+        const encoding = req.headers.get(headers.Name.ACCEPT_ENCODING);
         if (encoding) |e| {
             try res.setEncoding(e);
         }
+
+        try req.url.parse(req.headers.get(headers.Name.HOST));
 
         const route = try router.getRoute(req.method, req.url.raw_url);
         if (route) |r| {
@@ -110,7 +112,9 @@ fn acceptRequest(io: Io, arena: std.heap.ArenaAllocator, router: *Router, client
             defer url_params.deinit();
 
             req.setUrlParams(&url_params);
-            try r.handler(&req, &res, io, allocator);
+            r.handler(&req, &res, io, allocator) catch {
+                res.status = HttpStatus.internal_server_error;
+            };
         } else {
             res.status = HttpStatus.not_found;
         }
