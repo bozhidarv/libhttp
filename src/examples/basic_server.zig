@@ -46,12 +46,12 @@ pub fn main(init: std.process.Init) !void {
 
 fn handleIndex(_: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, _: std.Io, _: mem.Allocator) !void {
     slog.info("Hit index page", .{});
-    res.status = libhttp.HttpStatus.ok;
+    res.status = .ok;
 }
 
 fn handleEcho(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, _: std.Io, _: mem.Allocator) anyerror!void {
     slog.info("Hit echo page", .{});
-    res.status = libhttp.HttpStatus.ok;
+    res.status = .ok;
     try res.sendText(req.url.params.?.items[0]);
 }
 
@@ -80,7 +80,7 @@ fn handleWriteFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, 
     try req.body_reader.?.streamExact(writer, body_len.?);
     try writer.flush();
 
-    res.status = libhttp.HttpStatus.created;
+    res.status = .ok;
 }
 
 fn handleReadFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, _: std.Io, allocator: mem.Allocator) anyerror!void {
@@ -88,7 +88,7 @@ fn handleReadFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, _
     const file_name = req.url.params.?.items[0];
 
     if (directory == null) {
-        res.status = libhttp.HttpStatus.internal_server_error;
+        res.status = .internal_server_error;
         return;
     }
 
@@ -103,7 +103,7 @@ fn handleReadFile(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, _
         },
         else => return err,
     };
-    res.status = libhttp.HttpStatus.ok;
+    res.status = .ok;
 }
 
 fn handleUserAgent(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, _: std.Io, _: mem.Allocator) anyerror!void {
@@ -111,10 +111,10 @@ fn handleUserAgent(req: *const libhttp.HttpRequest, res: *libhttp.HttpResponse, 
     const user_agent = req.headers.get("user-agent");
 
     if (user_agent == null) {
-        res.status = libhttp.HttpStatus.internal_server_error;
+        res.status = .internal_server_error;
         return;
     }
 
-    res.status = libhttp.HttpStatus.ok;
+    res.status = .ok;
     try res.sendText(user_agent.?);
 }

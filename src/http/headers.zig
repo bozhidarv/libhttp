@@ -83,6 +83,16 @@ pub fn HeadersMap(comptime T: type) type {
                 else => return error.InvalidType
             }
         }
+
+        pub fn getFloat(self: *const HeadersMap(T), comptime FloatT: type, name: []const u8) (std.fmt.ParseFloatError || error{InvalidType})!?FloatT {
+            switch (@typeInfo(FloatT)) {
+                .float => {
+                    const value = self.get(name) orelse return null;
+                    return try std.fmt.parseFloat(FloatT, value);
+                },
+                else => return error.InvalidType
+            }
+        }
     };
 }
 
@@ -122,5 +132,34 @@ test "getInt functionality" {
 
     // Invalid type (non-integer)
     const type_err = headers.getInt(f32, "Content-Length");
+    try std.testing.expectError(error.InvalidType, type_err);
+}
+
+test "getFloat functionality" {
+    var headers = HeadersMap(std.StringHashMap([]const u8)).init(std.testing.allocator);
+    defer headers.deinit();
+
+    try headers.put("Content-Length", "1024");
+    try headers.put("Negative-Value", "-42.43");
+    try headers.put("Invalid-Value", "not_a_number");
+
+    // Valid positive integer
+    const length = try headers.getFloat(f64, "Content-Length");
+    try std.testing.expectEqual(@as(f64, 1024.0), length.?);
+
+    // Valid negative integer
+    const negative = try headers.getFloat(f32, "Negative-Value");
+    try std.testing.expectEqual(@as(f32, -42.43), negative.?);
+
+    // Missing header
+    const missing = try headers.getFloat(f64, "Missing-Header");
+    try std.testing.expectEqual(@as(?f64, null), missing);
+
+    // Invalid character in integer
+    const err = headers.getFloat(f64, "Invalid-Value");
+    try std.testing.expectError(error.InvalidCharacter, err);
+
+    // Invalid type (non-integer)
+    const type_err = headers.getFloat(i32, "Content-Length");
     try std.testing.expectError(error.InvalidType, type_err);
 }

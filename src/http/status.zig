@@ -55,7 +55,7 @@ pub const Status = enum(u16) {
     }
 
     /// Create status from integer code
-    pub fn fromCode(code: u16) Status {
+    pub fn custom(code: u16) Status {
         return @enumFromInt(code);
     }
 

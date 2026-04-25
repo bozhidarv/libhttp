@@ -2,7 +2,8 @@ const mem = std.mem;
 const Io = std.Io;
 const testing = std.testing;
 
-const HeadersMap = @import("headers.zig").UnmanagedHeadersMap;
+const headers_lib = @import("headers.zig");
+const HeadersMap = headers_lib.UnmanagedHeadersMap;
 const Method = @import("method.zig").Method;
 const Url = @import("url.zig");
 
@@ -23,7 +24,7 @@ pub fn setUrlParams(self: *HttpRequest, params: *const std.array_list.Managed([]
     self.url.params = params;
 }
 
-const HeaderError = error {InvalidHeader} || mem.Allocator.Error;
+const HeaderError = error{InvalidHeader} || mem.Allocator.Error;
 
 pub fn parseHeader(self: *HttpRequest, header_line: []const u8) HeaderError!void {
     var header_it = mem.splitSequence(u8, header_line, ": ");
@@ -66,6 +67,16 @@ pub fn parseRequestLine(self: *HttpRequest, req_line: []const u8) RequestLineErr
     if (req_it.peek() != null) {
         return RequestLineError.InvalidRequestLine;
     }
+}
+
+pub fn hasBody(self: *const HttpRequest) bool {
+    const content_len = self.headers.getInt(usize, headers_lib.Name.CONTENT_LENGTH) catch return false;
+    return content_len != null and content_len.? > 0;
+}
+
+pub fn keepConnection(self: *const HttpRequest) bool {
+    const conn_header = self.headers.get(headers_lib.Name.CONNECTION);
+    return conn_header != null and !mem.eql(u8, conn_header.?, "close");
 }
 
 pub fn deinit(self: *HttpRequest) void {
@@ -182,6 +193,7 @@ test "parseRequestLine parses url path" {
 
     var req: HttpRequest = .init(arena.allocator());
     try req.parseRequestLine("GET /api/users/123 HTTP/1.1");
+    try req.url.parse(req.headers.get(headers_lib.Name.HOST));
 
     try testing.expect(req.url.path.items.len == 3);
     try testing.expectEqualStrings("api", req.url.path.items[0]);
@@ -195,6 +207,7 @@ test "parseRequestLine parses query params" {
 
     var req: HttpRequest = .init(arena.allocator());
     try req.parseRequestLine("GET /search?q=hello&page=2 HTTP/1.1");
+    try req.url.parse(req.headers.get(headers_lib.Name.HOST));
 
     try testing.expect(req.url.query.count() == 2);
     try testing.expectEqualStrings("2", req.url.query.get("page").?);

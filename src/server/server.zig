@@ -49,7 +49,7 @@ fn acceptRequest(io: Io, arena: std.heap.ArenaAllocator, router: *Router, client
 
     var closed = false;
     while (!closed) {
-        var allocator: std.mem.Allocator = @constCast(&arena).allocator();
+        const allocator: std.mem.Allocator = @constCast(&arena).allocator();
         defer if (!closed) {
             _ = @constCast(&arena).reset(.free_all);
         };
@@ -85,16 +85,13 @@ fn acceptRequest(io: Io, arena: std.heap.ArenaAllocator, router: *Router, client
             try req.parseHeader(curr_line);
         }
 
-        const content_length_h = req.headers.get(headers.Name.CONTENT_LENGTH);
-        if (content_length_h) |_| {
+        if (req.hasBody()) {
             req.body_reader = reader;
         }
 
-        const conn_header = req.headers.get(headers.Name.CONNECTION);
-
         var res: HttpResponse = .init(allocator, io);
 
-        if (conn_header == null or (conn_header != null and std.mem.eql(u8, conn_header.?, "close"))) {
+        if (!req.keepConnection()) {
             closed = true;
             try res.headers.put(headers.Name.CONNECTION, "close");
         }
@@ -120,7 +117,6 @@ fn acceptRequest(io: Io, arena: std.heap.ArenaAllocator, router: *Router, client
         }
 
         const serialized_res = try res.serialize();
-        defer allocator.free(serialized_res);
 
         try writer.writeAll(serialized_res);
         try writer.flush();
