@@ -5,6 +5,7 @@ const libhttp = @import("libhttp");
 const slog = std.log;
 const logger = libhttp.logger;
 const headers = libhttp.headers;
+const builtin = @import("builtin");
 
 var directory: ?[]const u8 = null;
 
@@ -33,7 +34,12 @@ pub fn main(init: std.process.Init) !void {
 
     const port_parsed = try std.fmt.parseInt(u16, port_str, 10);
 
-    var server = libhttp.Server.init(init.gpa, init.io);
+    const allocator = switch (builtin.mode) {
+        .ReleaseFast => std.heap.smp_allocator,
+        else => init.gpa,
+    };
+
+    var server = libhttp.Server.init(allocator, init.io);
 
     try server.router.addRoute(.GET, "/", &handleIndex);
     try server.router.addRoute(.GET, "/echo/{str}", &handleEcho);

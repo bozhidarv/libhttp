@@ -76,7 +76,7 @@ pub fn build(b: *std.Build) void {
                 .target = target,
                 .optimize = optimize,
             }),
-            .use_llvm = true
+            // .use_llvm = true
         });
         example_exe.root_module.addImport("libhttp", lib_mod);
 
